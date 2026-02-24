@@ -126,7 +126,7 @@ public class Server {
             serverSeq++;
 
             int percent = (int)(totalSent * 100 / fileSize);
-            System.out.println("Sending... " + percent + "%");
+            System.out.println("\rSending... " + percent + "%");
         }
 
         fis.close();
@@ -136,6 +136,73 @@ public class Server {
         byte[] finPacket = Protocol.buildPacket(Protocol.MSG_FIN, sessionID, serverSeq, 0, null);
 
         sendPacket(socket, finPacket, clientAddr,  clientPort);
+    }
+
+    private static void handleUpload (DatagramSocket socket, InetAddress clientAddr, int clientPort,
+                                      int sessionID, Packet request, int serverSeq) throws Exception {
+        // step 1: filename and file size
+        String meta = new String(request.payload).trim();
+        String[] parts = meta.split("\\|");
+
+        String filename = parts[0].split(":")[1];
+        long fileSize = Long.parseLong(parts[1].split(":")[1]);
+
+        System.out.println("Client wants to upload: " + filename + " (" + fileSize + " bytes)");
+
+        byte[] readyPacket = Protocol.buildPacket(Protocol.MSG_ACK, sessionID, serverSeq, 0, "ready".getBytes());
+
+        sendPacket(socket, readyPacket, clientAddr, clientPort);
+        serverSeq++;
+
+        File file = new File (FILE_DIRECTORY, filename);
+        FileOutputStream fos = new FileOutputStream(file);
+
+        long totalReceived = 0;
+        int expectedSeq = request.seqNum + 1;
+        socket.setSoTimeout(Protocol.TIMEOUT_MS);
+
+        while (totalReceived < fileSize) {
+            try {
+                byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
+                DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
+                socket.receive(incoming);
+
+                Packet dataPacket = Protocol.parsePacket(incoming.getData());
+
+                // ignore broken packets
+                if (dataPacket == null || dataPacket.sessionId != sessionID) continue;
+
+                // check if client is done early
+                if (dataPacket.type == Protocol.MSG_FIN) break;
+
+                // resend last ack
+                if (dataPacket.type != Protocol.MSG_DATA || dataPacket.seqNum != expectedSeq) {
+                    byte[] ackPacket = Protocol.buildPacket(
+                            Protocol.MSG_ACK, sessionID, serverSeq, expectedSeq, null
+                    );
+                    sendPacket(socket, ackPacket, clientAddr, clientPort);
+                    continue;
+                }
+
+                //write chunk to file
+                fos.write(dataPacket.payload);
+                totalReceived += dataPacket.payload.length;
+                expectedSeq++;
+
+                int percent = (int)(totalReceived * 100 / fileSize);
+                System.out.println("\rReceiving..." + percent + "%");
+
+                byte[] ackPacket = Protocol.buildPacket(
+                        Protocol.MSG_ACK, sessionID, serverSeq, expectedSeq, null
+                );
+
+                sendPacket(socket, ackPacket, clientAddr, clientPort);
+
+            } catch (SocketTimeoutException e) {
+                System.out.println("\nTimeout waiting for data. Aborting");
+                break;
+            }
+        }
     }
 
     private static void sendPacket(DatagramSocket socket, byte[] data, InetAddress address, int port) throws Exception {
