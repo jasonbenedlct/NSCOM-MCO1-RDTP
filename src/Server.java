@@ -79,4 +79,95 @@ public class Server {
         }
     }
 
+    private static void handleDownload (DatagramSocket socket, InetAddress clientAddr, int clientPort,
+                                        int sessionID, Packet request, int serverSeq) throws Exception {
+        // get the file name
+        String filename = new String(request.payload).trim();
+        File file = new File(FILE_DIRECTORY, filename);
+        System.out.println("Client wants to download : " + filename);
+
+
+        // check if file exists
+        if (!file.exists()) {
+            byte[] errorPayload = new byte[]{Protocol.ERR_FILE_NOT_FOUND};
+            byte [] errorPacket = Protocol.buildPacket(Protocol.MSG_ERROR, sessionID, serverSeq, 0, errorPayload);
+
+            sendPacket(socket, errorPacket, clientAddr, clientPort);
+            System.out.println("File not found: " + filename);
+            return;
+        }
+
+        // tell client file size
+        long fileSize = file.length();
+        String meta = "size:" + fileSize;
+        byte [] ackPacket = Protocol.buildPacket(Protocol.MSG_ACK, sessionID, serverSeq, 0, meta.getBytes());
+
+        sendPacket(socket, ackPacket, clientAddr, clientPort);
+        serverSeq++;
+
+        //  read and send file in chunks
+        FileInputStream fis = new FileInputStream(file);
+        byte[] chunk = new byte[Protocol.SEGMENT_SIZE];
+        int bytesRead;
+        int totalSent = 0;
+
+        while((bytesRead = fis.read(chunk)) != -1) {
+            byte[] data = Arrays.copyOf(chunk, bytesRead);
+
+            boolean success = sendReliable (socket, clientAddr, clientPort, sessionID, serverSeq, data);
+
+            if (!success) {
+                System.out.println("Client stopped responding. Aborting. :( ");
+                fis.close();
+                return;
+            }
+
+            totalSent += bytesRead;
+            serverSeq++;
+
+            int percent = (int)(totalSent * 100 / fileSize);
+            System.out.println("Sending... " + percent + "%");
+        }
+
+        fis.close();
+        System.out.println("\nFile sent: " + filename);
+
+        // send fin
+        byte[] finPacket = Protocol.buildPacket(Protocol.MSG_FIN, sessionID, serverSeq, 0, null);
+
+        sendPacket(socket, finPacket, clientAddr,  clientPort);
+    }
+
+    private static void sendPacket(DatagramSocket socket, byte[] data, InetAddress address, int port) throws Exception {
+        DatagramPacket p = new DatagramPacket(data, data.length, address, port);
+        socket.send(p);
+    }
+
+    private static boolean sendReliable (DatagramSocket socket, InetAddress address, int port,
+                                         int sessionID, int seqNum, byte[] payload) throws Exception {
+        byte [] packet = Protocol.buildPacket(Protocol.MSG_DATA, sessionID, seqNum, 0, payload);
+
+        socket.setSoTimeout(Protocol.TIMEOUT_MS);
+
+        for (int attempt = 0; attempt < Protocol.MAX_RETRIES; attempt++) {
+            sendPacket(socket, packet, address, port);
+
+            try {
+                byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
+                DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
+                socket.receive(incoming);
+                Packet ack = Protocol.parsePacket(incoming.getData());
+
+                if (ack != null && ack.type == Protocol.MSG_ACK &&
+                    ack.sessionId == sessionID && ack.ackNum == seqNum + 1) {
+                    return true;
+                }
+            } catch (SocketTimeoutException e) {
+                System.out.println("\nTimeout, retrying... (" + (attempt+1) +"/" + Protocol.MAX_RETRIES +")");
+            }
+        }
+        return false;
+    }
+
+
 }
