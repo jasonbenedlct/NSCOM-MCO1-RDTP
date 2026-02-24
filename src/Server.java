@@ -64,6 +64,11 @@ public class Server {
         if (request == null) return; // no request from user, just return
 
         if (request.sessionId != sessionId) {
+            byte[] errorPayload = new byte[]{Protocol.ERR_SESSION_MISMATCH};
+            byte[] errorPacket = Protocol.buildPacket(
+                    Protocol.MSG_ERROR, sessionId, 0, 0, errorPayload
+            );
+            sendPacket(socket, errorPacket, clientAddr, clientPort);
             System.out.println("Given session ID does not match current session ID. Ignoring :)");
             return;
         }
@@ -186,7 +191,6 @@ public class Server {
                     continue;
                 }
 
-                //write chunk to file
                 fos.write(dataPacket.payload);
                 totalReceived += dataPacket.payload.length;
                 expectedSeq++;
