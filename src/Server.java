@@ -136,6 +136,8 @@ public class Server {
         byte[] finPacket = Protocol.buildPacket(Protocol.MSG_FIN, sessionID, serverSeq, 0, null);
 
         sendPacket(socket, finPacket, clientAddr,  clientPort);
+
+        waitForFin(socket, clientAddr, clientPort, sessionID, serverSeq + 1);
     }
 
     private static void handleUpload (DatagramSocket socket, InetAddress clientAddr, int clientPort,
@@ -234,6 +236,37 @@ public class Server {
             }
         }
         return false;
+    }
+
+    private static void waitForFin(DatagramSocket socket, InetAddress clientAddr,
+                                   int clientPort, int sessionId,
+                                   int serverSeq) throws Exception {
+
+        socket.setSoTimeout(Protocol.TIMEOUT_MS);
+        byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
+
+        for (int attempt = 0; attempt < Protocol.MAX_RETRIES; attempt++) {
+            try {
+                DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
+                socket.receive(incoming);
+                Packet packet = Protocol.parsePacket(incoming.getData());
+
+                if (packet == null || packet.sessionId != sessionId) continue;
+
+                if (packet.type == Protocol.MSG_FIN) {
+                    // send FIN-ACK
+                    byte[] finAck = Protocol.buildPacket(
+                            Protocol.MSG_FIN_ACK, sessionId, serverSeq, 0, null
+                    );
+                    sendPacket(socket, finAck, clientAddr, clientPort);
+                    System.out.println("Connection closed cleanly.");
+                    return;
+                }
+            } catch (SocketTimeoutException e) {
+                System.out.println("Waiting for FIN... (" + (attempt + 1) + "/" + Protocol.MAX_RETRIES + ")");
+            }
+        }
+        System.out.println("Client did not send FIN. Closing anyway.");
     }
 
 
