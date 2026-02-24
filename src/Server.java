@@ -22,6 +22,8 @@ public class Server {
     }
 
     private static void handleClient(DatagramSocket socket) throws Exception {
+        socket.setSoTimeout(0);
+
         // receiving syn
         byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
         DatagramPacket incomingPacket = new DatagramPacket(buffer, buffer.length);
@@ -74,10 +76,10 @@ public class Server {
         }
 
         if (request.type == Protocol.MSG_DOWNLOAD) {
-            System.out.println("handle download implement tomorrow plz");
+            handleDownload(socket, clientAddr, clientPort, sessionId, request, serverSeq + 1);
         }
         else if (request.type == Protocol.MSG_UPLOAD) {
-            System.out.println("handle upload implement tomorrow plz");
+            handleUpload(socket, clientAddr, clientPort, sessionId, request, serverSeq + 1);
         }
         else {
             System.out.println("Unknown request type. Ignoring :)");
@@ -209,6 +211,13 @@ public class Server {
                 break;
             }
         }
+
+        fos.close();
+
+        System.out.println("\nUpload complete: " + filename + " (" + totalReceived + " bytes)");
+
+        // wait for FIN then send FIN-ACK
+        waitForFin(socket, clientAddr, clientPort, sessionID, serverSeq);
     }
 
     private static void sendPacket(DatagramSocket socket, byte[] data, InetAddress address, int port) throws Exception {
