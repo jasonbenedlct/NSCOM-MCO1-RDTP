@@ -268,6 +268,4 @@ public class Server {
         }
         System.out.println("Client did not send FIN. Closing anyway.");
     }
-
-
 }
