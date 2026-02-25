@@ -176,7 +176,7 @@ public class Server {
 
         long totalReceived = 0;
         int expectedSeq = request.seqNum + 1;
-        socket.setSoTimeout(Protocol.TIMEOUT_MS * 5);
+        socket.setSoTimeout(Protocol.SESSION_TIMEOUT_MS);
 
         while (totalReceived < fileSize) {
             try {

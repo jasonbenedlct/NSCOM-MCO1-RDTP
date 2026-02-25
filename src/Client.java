@@ -115,7 +115,7 @@ public class Client {
         clientSeq++;
 
         // wait for file size ACK
-        socket.setSoTimeout(Protocol.TIMEOUT_MS * 5);
+        socket.setSoTimeout(Protocol.SESSION_TIMEOUT_MS);
         byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
         DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
         socket.receive(incoming);
@@ -315,6 +315,7 @@ public class Client {
         byte[] finPacket = Protocol.buildPacket(
                 Protocol.MSG_FIN, sessionId, clientSeq, 0, null
         );
+
         sendPacket(socket, finPacket, serverAddress, port);
 
         // wait for FIN-ACK

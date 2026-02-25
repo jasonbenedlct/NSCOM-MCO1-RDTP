@@ -22,6 +22,7 @@ public class Protocol {
     public static final int SEGMENT_SIZE = 1500;
     public static final int MAX_RETRIES = 10;
     public static final int TIMEOUT_MS = 2000;
+    public static final int SESSION_TIMEOUT_MS = 10000;
 
     // packet loss toggle
     public static boolean SIMULATE_PACKET_LOSS = false;
