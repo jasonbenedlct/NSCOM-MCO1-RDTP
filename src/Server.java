@@ -108,6 +108,7 @@ public class Server {
 
             sendPacket(socket, errorPacket, clientAddr, clientPort);
             System.out.println("File not found: " + filename);
+            System.out.println("Closing current session.");
             return;
         }
 

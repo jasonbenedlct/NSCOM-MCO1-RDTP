@@ -25,6 +25,14 @@ public class Client {
 
         System.out.println("Connecting to " + host + ":" + port);
 
+        if (operation.equalsIgnoreCase("upload")) {
+            File file = new File(filename);
+            if (!file.exists() || !file.isFile()) {
+                System.out.println("Error: Local file does not exist -> " + filename);
+                return; // Exit BEFORE bothering the server!
+            }
+        }
+
         // handshake
 
         int[] seqNums = doHandshake(socket, serverAddress, port);
@@ -143,8 +151,11 @@ public class Client {
         long totalReceived = 0;
         int expectedSeq = response.seqNum + 1;
 
+
+
         while (totalReceived < fileSize) {
             try {
+                System.out.println("[RECV] Expecting Seq: " + expectedSeq);
                 incoming = new DatagramPacket(buffer, buffer.length);
                 socket.receive(incoming);
                 Packet dataPacket = Protocol.parsePacket(incoming.getData());
@@ -179,7 +190,7 @@ public class Client {
 
                 // print progress
                 int percent = (int)(totalReceived * 100 / fileSize);
-                System.out.print("\rDownloading... " + percent + "%");
+                System.out.println("\rDownloading... " + percent + "%");
 
                 // send ACK
                 byte[] ackPacket = Protocol.buildPacket(
