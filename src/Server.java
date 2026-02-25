@@ -12,6 +12,13 @@ public class Server {
         }
 
         int port = Integer.parseInt(args[0]);
+
+        // check for simulate flag
+        if (args.length >= 2 && args[1].equalsIgnoreCase("simulate")) {
+            Protocol.SIMULATE_PACKET_LOSS = true;
+            System.out.println("[SIMULATE] Packet loss simulation enabled");
+        }
+
         DatagramSocket sock = new DatagramSocket(port);
         System.out.println("Server listening on port " + port);
         System.out.println("Serving files from : " + FILE_DIRECTORY);
@@ -239,7 +246,9 @@ public class Server {
                     + " | Size: " + payload.length + " bytes"
                     + " | Attempt: " + (attempt + 1));
 
-            sendPacket(socket, packet, address, port);
+            if (!shouldDropPacket()) {
+                sendPacket(socket, packet, address, port);
+            }
 
             try {
                 byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
@@ -287,5 +296,12 @@ public class Server {
             }
         }
         System.out.println("Client did not send FIN. Closing anyway.");
+    }
+
+    private static boolean shouldDropPacket() {
+        if (!Protocol.SIMULATE_PACKET_LOSS) return false;
+        Protocol.SIMULATE_PACKET_LOSS = false;
+        System.out.println("[SIMULATE] Packet dropped! Waiting for retransmission...");
+        return true;
     }
 }

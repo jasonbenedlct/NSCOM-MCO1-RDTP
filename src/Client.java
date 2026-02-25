@@ -107,7 +107,7 @@ public class Client {
         clientSeq++;
 
         // wait for file size ACK
-        socket.setSoTimeout(Protocol.TIMEOUT_MS);
+        socket.setSoTimeout(Protocol.TIMEOUT_MS * 5);
         byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
         DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
         socket.receive(incoming);
