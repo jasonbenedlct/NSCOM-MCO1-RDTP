@@ -23,6 +23,9 @@ public class Protocol {
     public static final int MAX_RETRIES = 10;
     public static final int TIMEOUT_MS = 2000;
 
+    // packet loss toggle
+    public static boolean SIMULATE_PACKET_LOSS = false;
+
     // build byte packet based on given parameters
     public static byte[] buildPacket (byte type, int sessionId,
                                       int seqNum, int ackNum, byte[] payload) {

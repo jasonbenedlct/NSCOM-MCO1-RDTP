@@ -168,10 +168,11 @@ public class Server {
 
         long totalReceived = 0;
         int expectedSeq = request.seqNum + 1;
-        socket.setSoTimeout(Protocol.TIMEOUT_MS);
+        socket.setSoTimeout(Protocol.TIMEOUT_MS * 5);
 
         while (totalReceived < fileSize) {
             try {
+                System.out.println("[RECV] Expecting Seq: " + expectedSeq);
                 byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
                 DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
                 socket.receive(incoming);
@@ -232,6 +233,12 @@ public class Server {
         socket.setSoTimeout(Protocol.TIMEOUT_MS);
 
         for (int attempt = 0; attempt < Protocol.MAX_RETRIES; attempt++) {
+
+            System.out.println("\n[SEND] DATA | SessionID: " + sessionID
+                    + " | Seq: " + seqNum
+                    + " | Size: " + payload.length + " bytes"
+                    + " | Attempt: " + (attempt + 1));
+
             sendPacket(socket, packet, address, port);
 
             try {
@@ -272,7 +279,7 @@ public class Server {
                             Protocol.MSG_FIN_ACK, sessionId, serverSeq, 0, null
                     );
                     sendPacket(socket, finAck, clientAddr, clientPort);
-                    System.out.println("Connection closed cleanly.");
+                    System.out.println("Connection closed cleanly.\n");
                     return;
                 }
             } catch (SocketTimeoutException e) {

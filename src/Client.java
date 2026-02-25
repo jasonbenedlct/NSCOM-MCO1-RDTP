@@ -10,6 +10,11 @@ public class Client {
             return;
         }
 
+        if (args.length >= 5 && args[4].equalsIgnoreCase("simulate")) {
+            Protocol.SIMULATE_PACKET_LOSS = true;
+            System.out.println("[SIMULATE] Packet loss simulation enabled");
+        }
+
         String host = args[0];
         int port = Integer.parseInt(args[1]);
         String operation = args[2];
@@ -176,7 +181,7 @@ public class Client {
                 int percent = (int)(totalReceived * 100 / fileSize);
                 System.out.print("\rDownloading... " + percent + "%");
 
-                // --- Step 4: send ACK ---
+                // send ACK
                 byte[] ackPacket = Protocol.buildPacket(
                         Protocol.MSG_ACK, sessionId, clientSeq, expectedSeq, null
                 );
@@ -196,7 +201,7 @@ public class Client {
         fos.close();
         System.out.println("\nDownload complete! Saved to: " + file.getPath());
 
-        // --- Step 5: send FIN to close session ---
+        //  send FIN to close session
         byte[] finPacket = Protocol.buildPacket(
                 Protocol.MSG_FIN, sessionId, clientSeq, 0, null
         );
@@ -336,7 +341,16 @@ public class Client {
         socket.setSoTimeout(Protocol.TIMEOUT_MS);
 
         for (int attempt = 0; attempt < Protocol.MAX_RETRIES; attempt++) {
-            sendPacket(socket, packet, address, port);
+
+            System.out.println("\n[SEND] DATA | SessionID: " + sessionId
+                    + " | Seq: " + seq
+                    + " | Size: " + payload.length + " bytes"
+                    + " | Attempt: " + (attempt + 1));
+
+            if (!shouldDropPacket()) {
+                sendPacket(socket, packet, address, port);
+            }
+
             try {
                 byte[] buffer = new byte[Protocol.HEADER_SIZE + Protocol.SEGMENT_SIZE];
                 DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
@@ -353,5 +367,14 @@ public class Client {
             }
         }
         return false;
+    }
+
+    // method for simulating packet dropping
+    private static boolean shouldDropPacket() {
+        if (!Protocol.SIMULATE_PACKET_LOSS) return false;
+        // turn off after dropping once so transfer can continue
+        Protocol.SIMULATE_PACKET_LOSS = false;
+        System.out.println("[SIMULATE] Packet dropped! Waiting for retransmission...");
+        return true;
     }
 }
